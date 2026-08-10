@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voya — GenAI Hotel Assistant</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --brand: #1e88e5;
+            --brand-dark: #1565c0;
+            --brand-grad: linear-gradient(135deg, #1e88e5, #1565c0);
+            --ink: #1f2937;
+            --ink-soft: #6b7280;
+            --line: #e5e7eb;
+            --chat-bg: #f6f7f9;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #eef0f3;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+            margin: 0;
+        }
+        .chat-container {
+            width: 100%;
+            max-width: 500px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 12px 40px rgba(17, 24, 39, 0.16), 0 2px 8px rgba(17, 24, 39, 0.06);
+            overflow: hidden;
+            position: relative;
+        }
+        /* ---------- Header ---------- */
+        .chat-header {
+            background: #fff;
+            border-bottom: 1px solid var(--line);
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .brand-logo {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: var(--brand-grad);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: none;
+            box-shadow: 0 2px 6px rgba(30, 136, 229, 0.35);
+        }
+        .chat-header-info { flex: 1; min-width: 0; }
+        .chat-header-info h1 {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--ink);
+            letter-spacing: -0.2px;
+        }
+        .online-status { display: flex; align-items: center; gap: 6px; margin-top: 1px; }
+        .online-status p { font-size: 12.5px; color: var(--ink-soft); }
+        .brand-badge {
+            font-size: 12px;
+            color: var(--ink-soft);
+            white-space: nowrap;
+            align-self: flex-end;
+            margin-bottom: 1px;
+        }
+        .online-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #22c55e;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+            flex: none;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .header-actions { display: flex; align-items: center; gap: 4px; }
+        .header-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            color: #9ca3af;
+            font-size: 17px;
+            line-height: 1;
+            cursor: default;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        /* ---------- Messages ---------- */
+        .chat-messages {
+            padding: 15px;
+            background-color: var(--chat-bg);
+            min-height: 320px;
+            max-height: 400px;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+        .chat-messages::-webkit-scrollbar { width: 5px; }
+        .chat-messages::-webkit-scrollbar-thumb { background: #d5d9df; border-radius: 3px; }
+        .day-divider {
+            display: flex;
+            justify-content: center;
+            margin: 2px 0 14px;
+        }
+        .day-divider span {
+            font-size: 11px;
+            font-weight: 600;
+            color: #9ca3af;
+            background: #eceef1;
+            padding: 4px 12px;
+            border-radius: 20px;
+            letter-spacing: 0.3px;
+        }
+        .message {
+            margin-bottom: 14px;
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            transform: translateY(15px);
+            transition: all 0.3s ease;
+        }
+        .message.show { opacity: 1; transform: translateY(0); }
+        .message.user { align-items: flex-end; }
+        .message.bot { align-items: flex-start; }
+        .bot-row { display: flex; align-items: flex-end; gap: 8px; max-width: 100%; width: 100%; }
+        .bot-avatar {
+            width: 28px;
+            height: 28px;
+            background: var(--brand-grad);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: none;
+            margin-bottom: 18px;
+        }
+        .bot-col { display: flex; flex-direction: column; min-width: 0; flex: 1; align-items: flex-start; }
+        .message-bubble {
+            max-width: 100%;
+            padding: 11px 15px;
+            border-radius: 16px;
+            font-size: 14.5px;
+            line-height: 1.55;
+        }
+        .message.user .message-bubble {
+            background: var(--brand-grad);
+            color: white;
+            border-bottom-right-radius: 4px;
+            max-width: 85%;
+            box-shadow: 0 1px 3px rgba(30, 136, 229, 0.25);
+        }
+        .message.bot .message-bubble {
+            background-color: #fff;
+            color: var(--ink);
+            border: 1px solid var(--line);
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 1px 2px rgba(17, 24, 39, 0.05);
+        }
+        .msg-time {
+            font-size: 10.5px;
+            color: #9ca3af;
+            margin-top: 4px;
+        }
+        .message.user .msg-time { margin-right: 6px; text-align: right; }
+        .message.bot .msg-time { margin-left: 6px; }
+        .message-label {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+        .message.user .message-label { margin-right: 8px; }
+        .message.bot .message-label { margin-left: 8px; }
+        .msg-ticks {
+            margin-left: 3px;
+            font-size: 10px;
+            color: #b7bcc4;
+            letter-spacing: -1px;
+            transition: color 0.4s ease;
+        }
+        .msg-ticks.seen { color: var(--brand); }
+        /* ---------- Product cards (all visible, no scrolling) ---------- */
+        .product-carousel {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            width: 100%;
+        }
+        .product-card {
+            flex: 1;
+            min-width: 0;
+            max-width: 142px;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(17, 24, 39, 0.06);
+        }
+        .product-img {
+            height: 68px;
+            background: linear-gradient(160deg, #f2f6fa, #e7edf3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .product-body { padding: 7px 8px 9px; }
+        .product-name { font-size: 11.5px; font-weight: 600; color: var(--ink); line-height: 1.3; min-height: 30px; }
+        .product-price { font-size: 12.5px; font-weight: 700; color: var(--ink); margin-top: 1px; }
+        .product-stock {
+            display: block;
+            font-size: 9px;
+            line-height: 1.35;
+            color: var(--ink-soft);
+            font-weight: 500;
+            margin-top: 3px;
+        }
+        .product-btn {
+            margin-top: 6px;
+            width: 100%;
+            padding: 5px 0;
+            font-size: 10px;
+            font-weight: 600;
+            font-family: inherit;
+            color: var(--brand);
+            background: #fff;
+            border: 1.5px solid var(--brand);
+            border-radius: 20px;
+            cursor: default;
+            white-space: nowrap;
+        }
+        /* ---------- Typing ---------- */
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 18px;
+            background: white;
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            border-bottom-left-radius: 4px;
+            width: fit-content;
+            box-shadow: 0 1px 2px rgba(17, 24, 39, 0.05);
+        }
+        .typing-text { font-size: 14px; color: #666; font-style: italic; }
+        .typing-dots { display: flex; gap: 4px; }
+        .typing-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #9ca3af;
+            animation: typing 1.4s infinite;
+        }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+            30% { transform: translateY(-5px); opacity: 1; }
+        }
+        /* ---------- Input ---------- */
+        .chat-input {
+            padding: 12px 14px 8px;
+            background-color: #fff;
+            border-top: 1px solid var(--line);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .input-icon {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: transparent;
+            color: #9ca3af;
+            cursor: default;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: none;
+        }
+        .input-icon.accent {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #ff9800, #f57c00);
+            color: #ffffff;
+            box-shadow: 0 2px 6px rgba(245, 124, 0, 0.35);
+        }
+        .chat-input textarea {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            font-size: 14px;
+            font-family: inherit;
+            outline: none;
+            background: #f5f6f8;
+            resize: none;
+            min-height: 44px;
+            max-height: 110px;
+            line-height: 1.5;
+            overflow-y: hidden;
+            color: var(--ink);
+            box-sizing: border-box;
+            transition: height 0.15s ease;
+        }
+        .send-button {
+            width: 40px;
+            height: 40px;
+            background: var(--brand-grad);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: none;
+            box-shadow: 0 2px 6px rgba(30, 136, 229, 0.35);
+        }
+        .chat-utility-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 2px 16px 6px;
+            background: #fff;
+        }
+        .utility-icons { display: flex; align-items: center; gap: 14px; }
+        .utility-icon {
+            background: none;
+            border: none;
+            color: #9ca3af;
+            cursor: default;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+        .rate-link { font-size: 11px; color: var(--brand); font-weight: 600; cursor: default; }
+        .chat-footer {
+            text-align: center;
+            font-size: 10.5px;
+            color: #b3b9c2;
+            background: #fff;
+            padding: 0 14px 10px;
+        }
+        /* ---------- Start / overlay / end ---------- */
+        .start-btn {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--brand-grad);
+            color: white;
+            border: none;
+            padding: 16px 36px;
+            font-size: 17px;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(30, 136, 229, 0.4);
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+        .start-btn:hover {
+            transform: translate(-50%, -50%) scale(1.05);
+            box-shadow: 0 15px 40px rgba(30, 136, 229, 0.6);
+        }
+        .start-btn.hidden { display: none; }
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            z-index: 999;
+            border-radius: 20px;
+        }
+        .overlay.hidden { display: none; }
+        .end-message {
+            text-align: center;
+            padding: 14px;
+            color: #9ca3af;
+            font-size: 13px;
+            font-style: italic;
+            background: var(--chat-bg);
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        .end-message.show { opacity: 1; }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="overlay" id="overlay"></div>
+        <button class="start-btn" id="startBtn">▶ Start Conversation</button>
+
+        <div class="chat-header">
+            <div class="brand-logo">
+                <svg viewBox="0 0 24 24" width="26" height="26" xmlns="http://www.w3.org/2000/svg"><line x1="12" y1="1.6" x2="12" y2="4" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round"/><circle cx="12" cy="1.3" r="1.05" fill="#ffffff"/><rect x="4" y="4" width="16" height="14.5" rx="6.5" fill="#ffffff"/><circle cx="9.1" cy="11.2" r="1.7" fill="#1565c0"/><circle cx="14.9" cy="11.2" r="1.7" fill="#1565c0"/><circle cx="8.6" cy="10.6" r="0.5" fill="#ffffff"/><circle cx="14.4" cy="10.6" r="0.5" fill="#ffffff"/><path d="M9.2 14.6 q2.8 2.1 5.6 0" fill="none" stroke="#1565c0" stroke-width="1.3" stroke-linecap="round"/><circle cx="6.4" cy="12.6" r="1" fill="#ff9fb2" opacity="0.65"/><circle cx="17.6" cy="12.6" r="1" fill="#ff9fb2" opacity="0.65"/></svg>
+            </div>
+            <div class="chat-header-info">
+                <h1>Voya</h1>
+                <div class="online-status">
+                    <span class="online-dot"></span>
+                    <p>GenAI Hotel Assistant</p>
+                </div>
+            </div>
+            <span class="brand-badge">TravelStay Co.</span>
+            <div class="header-actions">
+                <button class="header-btn" tabindex="-1"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><line x1="3.5" y1="9.5" x2="20.5" y2="9.5"/><line x1="8" y1="3" x2="8" y2="6.5"/><line x1="16" y1="3" x2="16" y2="6.5"/></svg></button>
+                <button class="header-btn" tabindex="-1">✕</button>
+            </div>
+        </div>
+        <div class="chat-messages" id="messages">
+            <div class="day-divider"><span>Today</span></div>
+        </div>
+        <div class="end-message" id="endMessage">— End of conversation —</div>
+        <div class="chat-input">
+            <button class="input-icon accent" tabindex="-1">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <textarea placeholder="Write a message…" disabled rows="1"></textarea>
+            <button class="send-button">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M2.5 21.5 L23 12 2.5 2.5 2.5 10 17 12 2.5 14 Z"/></svg>
+            </button>
+        </div>
+        <div class="chat-utility-row">
+            <div class="utility-icons">
+                <button class="utility-icon" tabindex="-1"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/><circle cx="9" cy="10" r="0.9" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r="0.9" fill="currentColor" stroke="none"/></svg></button>
+                <button class="utility-icon" tabindex="-1"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="12" rx="2.2"/><path d="M8 7V5.5A1.5 1.5 0 0 1 9.5 4h5A1.5 1.5 0 0 1 16 5.5V7"/><line x1="3" y1="12" x2="21" y2="12"/></svg></button>
+            </div>
+            <span class="rate-link">Rate this chat</span>
+        </div>
+        <div class="chat-footer">Powered by Voya AI · Responses are AI-generated</div>
+    </div>
+
+    <script>
+        const TYPING_WAIT = 3600;
+        const TYPING_APPEAR_DELAY = 600;
+        const USER_TYPING_SPEED = 30; // Her karakter arası ms
+
+        const inputField = document.querySelector('.chat-input textarea');
+
+        function scrollToBottom() {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            // Ekstra güvenlik için bir kez daha scroll
+            setTimeout(() => {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }, 100);
+        }
+
+        function nowTime() {
+            return new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        const messageTimes = [
+            800,    // Bot greeting
+            3500,   // User 1
+            12000,  // Bot 1
+            3000,   // User 2
+            10000   // Bot 2
+        ];
+
+        const svgHotel = `<svg viewBox="0 0 160 68" width="100%" height="68" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="vSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d7e7f5"/><stop offset="1" stop-color="#eff5fa"/></linearGradient>
+                <linearGradient id="vFac" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5efe6"/><stop offset="1" stop-color="#e2d8c9"/></linearGradient>
+            </defs>
+            <rect width="160" height="68" fill="url(#vSky)"/>
+            <rect x="0" y="24" width="30" height="36" fill="#c6d5e3"/>
+            <rect x="130" y="20" width="30" height="40" fill="#c6d5e3"/>
+            <rect x="118" y="30" width="14" height="30" fill="#d4e0ea"/>
+            <rect x="30" y="10" width="90" height="50" fill="url(#vFac)"/>
+            <rect x="28" y="10" width="94" height="4" rx="1" fill="#cdc1b0"/>
+            <rect x="37" y="19" width="10" height="7" rx="1" fill="#f3c87c"/>
+            <rect x="52" y="19" width="10" height="7" rx="1" fill="#b6cbdb"/>
+            <rect x="67" y="19" width="10" height="7" rx="1" fill="#f3c87c"/>
+            <rect x="82" y="19" width="10" height="7" rx="1" fill="#b6cbdb"/>
+            <rect x="97" y="19" width="10" height="7" rx="1" fill="#b6cbdb"/>
+            <rect x="37" y="31" width="10" height="7" rx="1" fill="#b6cbdb"/>
+            <rect x="52" y="31" width="10" height="7" rx="1" fill="#f3c87c"/>
+            <rect x="67" y="31" width="10" height="7" rx="1" fill="#b6cbdb"/>
+            <rect x="82" y="31" width="10" height="7" rx="1" fill="#b6cbdb"/>
+            <rect x="97" y="31" width="10" height="7" rx="1" fill="#f3c87c"/>
+            <rect x="30" y="43" width="90" height="1.4" fill="#cdc1b0"/>
+            <rect x="36" y="48" width="24" height="12" rx="1" fill="#b6cbdb"/>
+            <rect x="97" y="48" width="23" height="12" rx="1" fill="#b6cbdb"/>
+            <rect x="63" y="44.5" width="30" height="4" rx="1.6" fill="#1565c0"/>
+            <rect x="67" y="48.5" width="22" height="11.5" rx="1" fill="#9dbdd6"/>
+            <line x1="78" y1="48.5" x2="78" y2="60" stroke="#e8eef3" stroke-width="1.2"/>
+            <rect x="0" y="60" width="160" height="8" fill="#dde3e8"/>
+            <circle cx="24" cy="52" r="7" fill="#87b48c"/><rect x="23" y="55" width="2" height="6" fill="#8d7a63"/>
+            <circle cx="134" cy="50" r="8" fill="#7ba883"/><rect x="133" y="54" width="2.2" height="7" fill="#8d7a63"/>
+        </svg>`;
+        const svgBloomsbury = svgHotel;
+        const svgCovent = svgHotel;
+        const svgClerkenwell = svgHotel;
+
+        const botAvatarSvg = `<svg viewBox="0 0 24 24" width="17" height="17" xmlns="http://www.w3.org/2000/svg"><line x1="12" y1="1.6" x2="12" y2="4" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round"/><circle cx="12" cy="1.3" r="1.05" fill="#ffffff"/><rect x="4" y="4" width="16" height="14.5" rx="6.5" fill="#ffffff"/><circle cx="9.1" cy="11.2" r="1.7" fill="#1565c0"/><circle cx="14.9" cy="11.2" r="1.7" fill="#1565c0"/><circle cx="8.6" cy="10.6" r="0.5" fill="#ffffff"/><circle cx="14.4" cy="10.6" r="0.5" fill="#ffffff"/><path d="M9.2 14.6 q2.8 2.1 5.6 0" fill="none" stroke="#1565c0" stroke-width="1.3" stroke-linecap="round"/><circle cx="6.4" cy="12.6" r="1" fill="#ff9fb2" opacity="0.65"/><circle cx="17.6" cy="12.6" r="1" fill="#ff9fb2" opacity="0.65"/></svg>`;
+
+        function productCard(svg, name, price, desc) {
+            return `
+                <div class="product-card">
+                    <div class="product-img">${svg}</div>
+                    <div class="product-body">
+                        <div class="product-name">${name}</div>
+                        <div class="product-price">${price}</div>
+                        <span class="product-stock">${desc}</span>
+                        <button class="product-btn" tabindex="-1">Reserve room</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        const messages = [
+            {
+                type: 'bot',
+                content: `Hi, I'm Voya, your GenAI hotel assistant. How can I help you today?`
+            },
+            {
+                type: 'user',
+                content: `I am looking for a 4-star hotel in central London, under $150 per night, for three nights.`
+            },
+            {
+                type: 'bot',
+                content: `Several 4-star properties under $150 per night are available in central London for your dates. Based on your preferences, I recommend three:`,
+                products: [
+                    ['bloomsbury', 'Bloomsbury Library Hotel', '$125/night', 'Quiet streets, close to the British Museum'],
+                    ['covent', 'Covent Garden Cultural Inn', '$125/night', 'Theatre district, lively in the evenings'],
+                    ['clerkenwell', 'Clerkenwell Creative Hotel', '$125/night', 'Independent cafés and galleries nearby']
+                ]
+            },
+            {
+                type: 'user',
+                content: `I would like to continue.`
+            },
+            {
+                type: 'bot',
+                content: `Please choose one of the three recommended hotels, or continue browsing the other available hotels. Your selected hotel can then be reserved through the app, with concierge chat, room customization, and dining reservations available before and during your stay.`
+            }
+        ];
+
+        const productSvgs = { bloomsbury: svgBloomsbury, covent: svgCovent, clerkenwell: svgClerkenwell };
+
+        const messagesContainer = document.getElementById('messages');
+        const startBtn = document.getElementById('startBtn');
+        const overlay = document.getElementById('overlay');
+        const endMessage = document.getElementById('endMessage');
+        let typingIndicator = null;
+        let lastUserTicks = null;
+
+        function createTypingIndicator() {
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message bot show';
+            typingDiv.innerHTML = `
+                <div class="bot-row">
+                    <div class="bot-avatar">${botAvatarSvg}</div>
+                    <div class="typing-indicator">
+                        <span class="typing-text">Voya is typing</span>
+                        <div class="typing-dots">
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            return typingDiv;
+        }
+
+        function showTyping() {
+            if (lastUserTicks) {
+                lastUserTicks.classList.add('seen');
+                lastUserTicks = null;
+            }
+            if (!typingIndicator) {
+                typingIndicator = createTypingIndicator();
+                messagesContainer.appendChild(typingIndicator);
+                scrollToBottom();
+            }
+        }
+
+        function hideTyping() {
+            if (typingIndicator) {
+                typingIndicator.remove();
+                typingIndicator = null;
+            }
+        }
+
+        function autosizeInput() {
+            inputField.style.height = 'auto';
+            const maxHeight = 110;
+            inputField.style.height = Math.min(inputField.scrollHeight, maxHeight) + 'px';
+        }
+
+        function typeInInput(text) {
+            return new Promise((resolve) => {
+                const plainText = text.replace(/<[^>]*>/g, ''); // HTML taglerini kaldır
+                let i = 0;
+                inputField.value = '';
+                autosizeInput();
+
+                const typeInterval = setInterval(() => {
+                    if (i < plainText.length) {
+                        inputField.value += plainText.charAt(i);
+                        autosizeInput();
+                        i++;
+                    } else {
+                        clearInterval(typeInterval);
+                        setTimeout(() => {
+                            inputField.value = '';
+                            autosizeInput();
+                            resolve();
+                        }, 300); // Yazı bittikten sonra kısa bekleme
+                    }
+                }, USER_TYPING_SPEED);
+            });
+        }
+
+        function showMessage(msg, index, maxWaitTime = null) {
+            return new Promise(async (resolve) => {
+                hideTyping();
+
+                // User mesajıysa önce input'a yaz
+                if (msg.type === 'user') {
+                    await typeInInput(msg.content);
+                }
+
+                const messageDiv = document.createElement('div');
+                messageDiv.className = index === 0 ? `message ${msg.type} show` : `message ${msg.type}`;
+
+                if (msg.type === 'user') {
+                    messageDiv.innerHTML = `
+                        <span class="message-label">You</span>
+                        <div class="message-bubble">${msg.content}</div>
+                        <span class="msg-time">${nowTime()}<span class="msg-ticks">✓✓</span></span>
+                    `;
+                    lastUserTicks = messageDiv.querySelector('.msg-ticks');
+                } else {
+                    const carousel = msg.products
+                        ? `<div class="product-carousel">${msg.products.map(p => productCard(productSvgs[p[0]], p[1], p[2], p[3])).join('')}</div>`
+                        : '';
+                    messageDiv.innerHTML = `
+                        <div class="bot-row">
+                            <div class="bot-avatar">${botAvatarSvg}</div>
+                            <div class="bot-col">
+                                <span class="message-label">Voya</span>
+                                <div class="message-bubble">${msg.content}</div>
+                                ${carousel}
+                                <span class="msg-time">${nowTime()}</span>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                messagesContainer.appendChild(messageDiv);
+                setTimeout(() => {
+                    messageDiv.classList.add('show');
+                    scrollToBottom();
+
+                    // Son mesajsa hemen end message göster
+                    if (index === messages.length - 1) {
+                        endMessage.classList.add('show');
+                        scrollToBottom();
+                    }
+                }, 50);
+
+                const nextMsg = messages[index + 1];
+                if (nextMsg && nextMsg.type === 'bot') {
+                    setTimeout(() => {
+                        showTyping();
+                        scrollToBottom();
+                    }, TYPING_APPEAR_DELAY);
+                }
+
+                // Bekleme süresini belirle
+                let waitTime = messageTimes[index];
+                if (maxWaitTime !== null) {
+                    waitTime = Math.min(waitTime, maxWaitTime);
+                }
+
+                setTimeout(resolve, waitTime);
+            });
+        }
+
+        async function startSimulation() {
+            startBtn.classList.add('hidden');
+            overlay.classList.add('hidden');
+
+            for (let i = 0; i < messages.length; i++) {
+                const msg = messages[i];
+                const nextMsg = messages[i + 1];
+
+                if (msg.type === 'user') {
+                    await showMessage(msg, i);
+                    if (nextMsg && nextMsg.type === 'bot') {
+                        showTyping();
+                        await new Promise(resolve => setTimeout(resolve, TYPING_WAIT));
+                    }
+                } else {
+                    // Bot mesajından sonra user geliyorsa max 1 saniye bekle
+                    const maxWait = (nextMsg && nextMsg.type === 'user') ? 2000 : null;
+                    await showMessage(msg, i, maxWait);
+                }
+            }
+        }
+
+        startBtn.addEventListener('click', startSimulation);
+    </script>
+</body>
+</html>
